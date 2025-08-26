@@ -1,24 +1,61 @@
+import { db } from '../db';
+import { equipmentTable, equipmentTransactionsTable, adminsTable } from '../db/schema';
 import { type CheckOutEquipmentInput, type EquipmentTransaction } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
-export async function checkOutEquipment(input: CheckOutEquipmentInput): Promise<EquipmentTransaction> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is checking out equipment to a user.
-    // Should:
-    // 1. Verify equipment exists and is available
-    // 2. Update equipment status to 'checked_out'
-    // 3. Create a transaction record with type 'check_out'
-    // 4. Return the transaction record
-    return Promise.resolve({
-        id: 0, // Placeholder ID
+export const checkOutEquipment = async (input: CheckOutEquipmentInput): Promise<EquipmentTransaction> => {
+  try {
+    // 1. Verify admin exists
+    const admin = await db.select()
+      .from(adminsTable)
+      .where(eq(adminsTable.id, input.admin_id))
+      .execute();
+
+    if (admin.length === 0) {
+      throw new Error(`Admin with id ${input.admin_id} not found`);
+    }
+
+    // 2. Verify equipment exists and is available
+    const equipment = await db.select()
+      .from(equipmentTable)
+      .where(eq(equipmentTable.id, input.equipment_id))
+      .execute();
+
+    if (equipment.length === 0) {
+      throw new Error(`Equipment with id ${input.equipment_id} not found`);
+    }
+
+    if (equipment[0].status !== 'available') {
+      throw new Error(`Equipment is not available (current status: ${equipment[0].status})`);
+    }
+
+    // 3. Update equipment status to 'checked_out'
+    await db.update(equipmentTable)
+      .set({ 
+        status: 'checked_out',
+        updated_at: new Date()
+      })
+      .where(eq(equipmentTable.id, input.equipment_id))
+      .execute();
+
+    // 4. Create a transaction record with type 'check_out'
+    const result = await db.insert(equipmentTransactionsTable)
+      .values({
         equipment_id: input.equipment_id,
         admin_id: input.admin_id,
         transaction_type: 'check_out',
         user_name: input.user_name,
         user_contact: input.user_contact || null,
         notes: input.notes || null,
-        transaction_date: new Date(),
         expected_return_date: input.expected_return_date || null,
-        actual_return_date: null,
-        created_at: new Date(),
-    } as EquipmentTransaction);
-}
+        actual_return_date: null
+      })
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Equipment check-out failed:', error);
+    throw error;
+  }
+};

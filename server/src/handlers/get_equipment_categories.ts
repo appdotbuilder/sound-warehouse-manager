@@ -1,6 +1,23 @@
-export async function getEquipmentCategories(): Promise<string[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching all unique equipment categories from the database.
-    // This is useful for filtering and dropdown options in the UI.
-    return Promise.resolve(['Audio', 'Lighting', 'Video', 'Cables', 'Microphones', 'Speakers']);
-}
+import { db } from '../db';
+import { equipmentTable } from '../db/schema';
+import { sql } from 'drizzle-orm';
+
+export const getEquipmentCategories = async (): Promise<string[]> => {
+  try {
+    // Query to get distinct categories from equipment table
+    const results = await db
+      .select({
+        category: equipmentTable.category
+      })
+      .from(equipmentTable)
+      .groupBy(equipmentTable.category)
+      .orderBy(equipmentTable.category)
+      .execute();
+
+    // Extract category strings from the results
+    return results.map(result => result.category);
+  } catch (error) {
+    console.error('Failed to fetch equipment categories:', error);
+    throw error;
+  }
+};

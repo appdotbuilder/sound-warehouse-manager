@@ -1,15 +1,26 @@
+import { db } from '../db';
+import { adminsTable } from '../db/schema';
 import { type CreateAdminInput, type Admin } from '../schema';
 
-export async function createAdmin(input: CreateAdminInput): Promise<Admin> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new admin user, hashing the password,
-    // and persisting the user in the database.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
+export const createAdmin = async (input: CreateAdminInput): Promise<Admin> => {
+  try {
+    // Hash the password using Bun's built-in password hashing
+    const password_hash = await Bun.password.hash(input.password);
+
+    // Insert admin record
+    const result = await db.insert(adminsTable)
+      .values({
         username: input.username,
         email: input.email,
-        password_hash: 'hashed_password_placeholder', // Should hash input.password
-        created_at: new Date(),
-        updated_at: new Date(),
-    } as Admin);
-}
+        password_hash: password_hash
+      })
+      .returning()
+      .execute();
+
+    const admin = result[0];
+    return admin;
+  } catch (error) {
+    console.error('Admin creation failed:', error);
+    throw error;
+  }
+};
